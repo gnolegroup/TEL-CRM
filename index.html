@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales CRM Dashboard</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <style>
+    /* ─── TOKENS ───────────────────────────────────── */
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181c26;
+      --surface2:  #1e2333;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.13);
+      --text:      #e8eaf0;
+      --muted:     #7a7f94;
+      --accent:    #3ecf8e;
+      --accent2:   #2563eb;
+      --warn:      #f59e0b;
+      --danger:    #ef4444;
+      --radius:    10px;
+      --radius-lg: 14px;
+      --font:      'DM Sans', sans-serif;
+      --mono:      'DM Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ─── LAYOUT ────────────────────────────────────── */
+    .shell { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 20px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #0f1117;
+      font-size: 16px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 0;
+      font-size: 13px;
+      transition: background 0.15s, color 0.15s;
+      text-decoration: none;
+      border-left: 2px solid transparent;
+    }
+
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(62,207,142,0.06); }
+    .nav-item i { font-size: 16px; }
+
+    .nav-section {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 14px 20px 6px;
+      text-transform: uppercase;
+    }
+
+    .main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+
+    /* ─── TOP BAR ───────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .topbar h1 { font-size: 20px; font-weight: 600; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .month-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(62,207,142,0.12);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ─── METRIC CARDS ──────────────────────────────── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .metric.green::before  { background: var(--accent); }
+    .metric.blue::before   { background: var(--accent2); }
+    .metric.amber::before  { background: var(--warn); }
+    .metric.red::before    { background: var(--danger); }
+
+    .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
+    .metric-value { font-size: 26px; font-weight: 600; color: var(--text); font-family: var(--mono); }
+    .metric-sub   { font-size: 11px; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+    .up   { color: var(--accent); }
+    .down { color: var(--danger); }
+    .neutral { color: var(--muted); }
+
+    /* ─── CHARTS ROW ────────────────────────────────── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ─── PIPELINE BARS ─────────────────────────────── */
+    .pipeline-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .stage-label { font-size: 12px; color: var(--muted); width: 90px; flex-shrink: 0; }
+
+    .bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+    .stage-count { font-size: 11px; font-family: var(--mono); color: var(--muted); width: 20px; text-align: right; }
+    .stage-val   { font-size: 11px; font-family: var(--mono); color: var(--text); width: 46px; text-align: right; }
+
+    /* ─── REVENUE TARGET BAR ────────────────────────── */
+    .target-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .target-track {
+      flex: 1;
+      height: 10px;
+      background: var(--surface2);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .target-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 5px;
+      transition: width 0.6s ease;
+    }
+
+    .target-pct { font-size: 12px; font-family: var(--mono); color: var(--accent); min-width: 36px; text-align: right; }
+
+    /* ─── LEADS TABLE ───────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0 10px 10px 0;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 11px 10px 11px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface2); }
+
+    .pill {
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    .pill-new   { background: rgba(37,99,235,0.15);  color: #60a5fa; }
+    .pill-qual  { background: rgba(62,207,142,0.12); color: var(--accent); }
+    .pill-prop  { background: rgba(245,158,11,0.12); color: var(--warn); }
+    .pill-neg   { background: rgba(168,85,247,0.12); color: #c084fc; }
+    .pill-won   { background: rgba(62,207,142,0.18); color: var(--accent); }
+    .pill-lost  { background: rgba(239,68,68,0.12);  color: var(--danger); }
+
+    .avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* ─── LOADING STATE ─────────────────────────────── */
+    .loading { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+
+    /* ─── LEGEND ────────────────────────────────────── */
+    .legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ─── RESPONSIVE ────────────────────────────────── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .charts-row { grid-template-columns: 1fr; }
+      .main { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <nav class="sidebar" aria-label="Main navigation">
+    <div class="logo">
+      <div class="logo-icon"><i class="ti ti-chart-bar"></i></div>
+      SalesCRM
+    </div>
+
+    <a class="nav-item active" href="#"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+    <a class="nav-item" href="#"><i class="ti ti-users"></i> Leads</a>
+    <a class="nav-item" href="#"><i class="ti ti-briefcase"></i> Deals</a>
+    <a class="nav-item" href="#"><i class="ti ti-building"></i> Companies</a>
+
+    <div class="nav-section">Analytics</div>
+    <a class="nav-item" href="#"><i class="ti ti-chart-line"></i> Revenue</a>
+    <a class="nav-item" href="#"><i class="ti ti-funnel"></i> Pipeline</a>
+    <a class="nav-item" href="#"><i class="ti ti-report"></i> Reports</a>
+
+    <div class="nav-section">Settings</div>
+    <a class="nav-item" href="#"><i class="ti ti-settings"></i> Settings</a>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h1>Dashboard</h1>
+        <span class="month-badge" id="current-period">May 2026</span>
+      </div>
+      <div class="topbar-right">
+        <select id="period-select" onchange="handlePeriodChange(this.value)">
+          <option value="month">This Month</option>
+          <option value="quarter">This Quarter</option>
+          <option value="year">This Year</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="metrics" id="metrics-grid">
+      <div class="metric green">
+        <div class="metric-label">Monthly Revenue</div>
+        <div class="metric-value" id="m-revenue">—</div>
+        <div class="metric-sub up"><i class="ti ti-trending-up"></i> <span id="m-revenue-sub">loading…</span></div>
+      </div>
+      <div class="metric blue">
+        <div class="metric-label">Monthly Target</div>
+        <div class="metric-value" id="m-target">—</div>
+        <div class="metric-sub neutral" id="m-target-sub">loading…</div>
+      </div>
+      <div class="metric amber">
+        <div class="metric-label">Open Leads</div>
+        <div class="metric-value" id="m-leads">—</div>
+        <div class="metric-sub up" id="m-leads-sub">loading…</div>
+      </div>
+      <div class="metric red">
+        <div class="metric-label">Pipeline Value</div>
+        <div class="metric-value" id="m-pipeline">—</div>
+        <div class="metric-sub neutral" id="m-pipeline-sub">loading…</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-row">
+
+      <!-- Revenue chart -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Revenue vs Target</span>
+        </div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#3ecf8e;"></span>Revenue</span>
+          <span><span class="leg-dot" style="background:#7a7f94;border:1px dashed #7a7f94;"></span>Target</span>
+        </div>
+        <div style="position:relative;width:100%;height:220px;">
+          <canvas id="revChart" role="img" aria-label="Monthly revenue versus target bar chart">Revenue and target data for recent months.</canvas>
+        </div>
+      </div>
+
+      <!-- Pipeline by stage -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Pipeline by Stage</span>
+        </div>
+        <div id="pipeline-bars">
+          <div class="loading"><i class="ti ti-loader ti-spin"></i> Loading…</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Leads table -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Leads</span>
+        <select id="stage-filter" onchange="filterLeads(this.value)" style="font-size:11px;padding:4px 8px;">
+          <option value="">All stages</option>
+          <option value="new">New</option>
+          <option value="qualified">Qualified</option>
+          <option value="proposal">Proposal</option>
+          <option value="negotiation">Negotiation</option>
+          <option value="closed_won">Closed Won</option>
+          <option value="closed_lost">Closed Lost</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table aria-label="Recent leads">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Company</th>
+              <th>Value</th>
+              <th>Stage</th>
+              <th>Owner</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="leads-tbody">
+            <tr><td colspan="6" class="loading"><i class="ti ti-loader ti-spin"></i> Loading leads…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  /* ─────────────────────────────────────────────────────
+     SUPABASE CONFIG
+     Replace these two values with your project credentials
+     from: Supabase dashboard → Settings → API
+  ───────────────────────────────────────────────────── */
+  const SUPABASE_URL  = 'https://YOUR_PROJECT_ID.supabase.co';
+  const SUPABASE_ANON = 'YOUR_ANON_KEY';
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  /* ─── MOCK DATA (used when Supabase is not configured) ─── */
+  const MOCK_LEADS = [
+    { id:1, name:'Aisha Karimi',   company:'Nexbridge Ltd',  value:24000, stage:'negotiation', owner_initials:'JT', updated_at: new Date().toISOString() },
+    { id:2, name:'Marco Delgado',  company:'Orion Systems',  value:41500, stage:'proposal',    owner_initials:'SR', updated_at: new Date(Date.now()-86400000).toISOString() },
+    { id:3, name:'Priya Nair',     company:'CloudSpark',     value:18750, stage:'qualified',   owner_initials:'JT', updated_at: new Date(Date.now()-172800000).toISOString() },
+    { id:4, name:'Sam Okonkwo',    company:'Velodata Inc',   value:9200,  stage:'new',         owner_initials:'LM', updated_at: new Date(Date.now()-259200000).toISOString() },
+    { id:5, name:'Elena Voss',     company:'Brightfield Co', value:33000, stage:'closed_won',  owner_initials:'SR', updated_at: new Date(Date.now()-432000000).toISOString() },
+    { id:6, name:'Tariq Mansour',  company:'Deltaworks',     value:15500, stage:'new',         owner_initials:'LM', updated_at: new Date(Date.now()-518400000).toISOString() },
+  ];
+
+  const MOCK_REVENUE = [
+    { month:'2026-01-01', actual:62000, target:100000 },
+    { month:'2026-02-01', actual:71000, target:100000 },
+    { month:'2026-03-01', actual:58000, target:100000 },
+    { month:'2026-04-01', actual:75000, target:100000 },
+    { month:'2026-05-01', actual:84200, target:100000 },
+  ];
+
+  /* ─── STATE ─── */
+  let allLeads = [];
+  let revChart = null;
+
+  /* ─── HELPERS ─── */
+  const fmt  = (n) => n >= 1000 ? '$' + (n/1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K' : '$' + n;
+  const fmt2 = (n) => '$' + Math.round(n).toLocaleString();
+
+  const avatarColors = [
+    ['#1a3a5c','#60a5fa'], ['#1a3a2e','#3ecf8e'],
+    ['#3a1a2e','#c084fc'], ['#3a2a1a','#f59e0b'],
+  ];
+
+  function avatarStyle(initials) {
+    const idx = (initials.charCodeAt(0) + (initials.charCodeAt(1)||0)) % avatarColors.length;
+    return `background:${avatarColors[idx][0]};color:${avatarColors[idx][1]};`;
+  }
+
+  function stagePill(stage) {
+    const map = {
+      new:        ['pill-new',  'New'],
+      qualified:  ['pill-qual', 'Qualified'],
+      proposal:   ['pill-prop', 'Proposal'],
+      negotiation:['pill-neg',  'Negotiation'],
+      closed_won: ['pill-won',  'Won'],
+      closed_lost:['pill-lost', 'Lost'],
+    };
+    const [cls, label] = map[stage] || ['pill-new', stage];
+    return `<span class="pill ${cls}">${label}</span>`;
+  }
+
+  function relativeTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return new Date(iso).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  }
+
+  /* ─── IS SUPABASE CONFIGURED? ─── */
+  function isConfigured() {
+    return SUPABASE_URL !== 'https://YOUR_PROJECT_ID.supabase.co';
+  }
+
+  /* ─── FETCH LEADS ─── */
+  async function fetchLeads() {
+    if (!isConfigured()) return MOCK_LEADS;
+    const { data, error } = await sb.from('leads').select('*').order('updated_at', { ascending: false }).limit(50);
+    if (error) { console.error(error); return MOCK_LEADS; }
+    return data;
+  }
+
+  /* ─── FETCH REVENUE ─── */
+  async function fetchRevenue() {
+    if (!isConfigured()) return MOCK_REVENUE;
+    const { data, error } = await sb.from('revenue_targets').select('*').order('month').limit(12);
+    if (error) { console.error(error); return MOCK_REVENUE; }
+    return data;
+  }
+
+  /* ─── RENDER METRIC CARDS ─── */
+  function renderMetrics(leads, revenue) {
+    const latest = revenue[revenue.length - 1] || {};
+    const actual = latest.actual || 0;
+    const target = latest.target || 100000;
+    const pct    = Math.round((actual / target) * 100);
+
+    const openLeads = leads.filter(l => !['closed_won','closed_lost'].includes(l.stage));
+    const pipeline  = openLeads.reduce((s, l) => s + (l.value || 0), 0);
+
+    document.getElementById('m-revenue').textContent     = fmt2(actual);
+    document.getElementById('m-revenue-sub').textContent = pct + '% of target';
+    document.getElementById('m-target').textContent      = fmt2(target);
+    document.getElementById('m-target-sub').textContent  = pct + '% attained';
+    document.getElementById('m-leads').textContent       = openLeads.length;
+    document.getElementById('m-leads-sub').textContent   = openLeads.filter(l=>l.stage==='new').length + ' new this week';
+    document.getElementById('m-pipeline').textContent    = fmt(pipeline);
+    document.getElementById('m-pipeline-sub').textContent = openLeads.length + ' active deals';
+  }
+
+  /* ─── RENDER PIPELINE BARS ─── */
+  function renderPipelineBars(leads) {
+    const stages = [
+      { key:'new',         label:'New',         color:'#2563eb' },
+      { key:'qualified',   label:'Qualified',   color:'#3ecf8e' },
+      { key:'proposal',    label:'Proposal',    color:'#f59e0b' },
+      { key:'negotiation', label:'Negotiation', color:'#c084fc' },
+      { key:'closed_won',  label:'Closed Won',  color:'#3ecf8e' },
+    ];
+
+    const counts = {};
+    const values = {};
+    stages.forEach(s => { counts[s.key] = 0; values[s.key] = 0; });
+    leads.forEach(l => {
+      if (counts[l.stage] !== undefined) {
+        counts[l.stage]++;
+        values[l.stage] += (l.value || 0);
+      }
+    });
+
+    const maxCount = Math.max(...stages.map(s => counts[s.key]), 1);
+
+    document.getElementById('pipeline-bars').innerHTML = stages.map(s => `
+      <div class="pipeline-row">
+        <span class="stage-label">${s.label}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${Math.round((counts[s.key]/maxCount)*100)}%;background:${s.color};"></div>
+        </div>
+        <span class="stage-count">${counts[s.key]}</span>
+        <span class="stage-val">${fmt(values[s.key])}</span>
+      </div>
+    `).join('');
+  }
+
+  /* ─── RENDER REVENUE CHART ─── */
+  function renderRevenueChart(revenue) {
+    const labels  = revenue.map(r => new Date(r.month).toLocaleDateString('en-GB', { month:'short' }));
+    const actuals = revenue.map(r => r.actual || 0);
+    const targets = revenue.map(r => r.target || 0);
+
+    if (revChart) { revChart.destroy(); }
+
+    revChart = new Chart(document.getElementById('revChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Revenue',
+            data: actuals,
+            backgroundColor: '#3ecf8e',
+            borderRadius: 5,
+            borderSkipped: false,
+            order: 2,
+          },
+          {
+            label: 'Target',
+            data: targets,
+            type: 'line',
+            borderColor: '#7a7f94',
+            borderDash: [5, 4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false,
+            tension: 0,
+            order: 1,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ' ' + ctx.dataset.label + ': $' + Math.round(ctx.raw).toLocaleString()
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11, family: "'DM Mono', monospace" }, color: '#7a7f94' }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: {
+              font: { size: 11, family: "'DM Mono', monospace" },
+              color: '#7a7f94',
+              callback: (v) => '$' + Math.round(v/1000) + 'K'
+            },
+            min: 0,
+          }
+        }
+      }
+    });
+  }
+
+  /* ─── RENDER LEADS TABLE ─── */
+  function renderLeads(leads) {
+    if (!leads.length) {
+      document.getElementById('leads-tbody').innerHTML =
+        `<tr><td colspan="6" class="loading">No leads found.</td></tr>`;
+      return;
+    }
+
+    document.getElementById('leads-tbody').innerHTML = leads.map(l => `
+      <tr>
+        <td style="font-weight:500;">${l.name}</td>
+        <td style="color:#7a7f94;">${l.company || '—'}</td>
+        <td style="font-family:var(--mono);">${fmt2(l.value || 0)}</td>
+        <td>${stagePill(l.stage)}</td>
+        <td>
+          <span class="avatar" style="${avatarStyle(l.owner_initials || 'XX')}" title="${l.owner_initials}">
+            ${l.owner_initials || '?'}
+          </span>
+        </td>
+        <td style="color:#7a7f94;">${relativeTime(l.updated_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  /* ─── FILTER ─── */
+  function filterLeads(stage) {
+    const filtered = stage ? allLeads.filter(l => l.stage === stage) : allLeads;
+    renderLeads(filtered);
+  }
+
+  function handlePeriodChange(val) {
+    const labels = { month: 'May 2026', quarter: 'Q2 2026', year: '2026' };
+    document.getElementById('current-period').textContent = labels[val] || 'May 2026';
+    // Re-fetch or re-filter based on period as needed
+  }
+
+  /* ─── INIT ─── */
+  async function init() {
+    const [leads, revenue] = await Promise.all([fetchLeads(), fetchRevenue()]);
+    allLeads = leads;
+
+    renderMetrics(leads, revenue);
+    renderPipelineBars(leads);
+    renderRevenueChart(revenue);
+    renderLeads(leads);
+
+    if (!isConfigured()) {
+      console.info('[SalesCRM] Running with mock data. Set SUPABASE_URL and SUPABASE_ANON to connect to your database.');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
